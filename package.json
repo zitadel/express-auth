@@ -68,31 +68,31 @@
     "@tsconfig/node22": "^22.0.2",
     "@types/express": "^5.0.3",
     "@types/jest": "30.0.0",
-    "@types/node": "^22.18.13",
+    "@types/node": "^25.6.0",
     "@types/qs": "^6.14.0",
-    "@types/supertest": "^6.0.3",
-    "eslint": "9.32.0",
-    "jest": "30.0.5",
-    "jest-junit": "^16.0.0",
-    "knip": "^5.83.0",
-    "prettier": "3.6.2",
+    "@types/supertest": "^7.2.0",
+    "eslint": "10.2.1",
+    "jest": "30.3.0",
+    "jest-junit": "^17.0.0",
+    "knip": "^6.7.0",
+    "prettier": "3.8.3",
     "semantic-release": "^25.0.1",
     "supertest": "^7.1.4",
-    "ts-jest": "29.4.0",
+    "ts-jest": "29.4.9",
     "typedoc": "^0.28.7",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zitadel/express-auth.git"
   },
   "dependencies": {
-    "@auth/core": ">=0.40.0",
+    "@auth/core": ">=0.41.2",
     "express": "^4.18.2 || ^5.0.0",
     "qs": "^6.14.0"
   },
   "peerDependencies": {
-    "@auth/core": ">=0.40.0",
+    "@auth/core": ">=0.41.2",
     "express": "^4.18.2 || ^5.0.0"
   },
   "private": false,
