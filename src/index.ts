@@ -3,13 +3,11 @@ import {
   type AuthConfig,
   setEnvDefaults,
   createActionURL,
-  customFetch,
 } from '@auth/core';
 import type { Session } from '@auth/core/types';
 import * as e from 'express';
 import { toWebRequest, toExpressResponse } from './lib/index.js';
 
-export { customFetch };
 export { AuthError, CredentialsSignin } from '@auth/core/errors';
 export type {
   Account,
@@ -29,6 +27,8 @@ export type ExpressAuthConfig = Omit<AuthConfig, 'raw'>;
  *
  * @param config - The Auth.js configuration object
  * @returns An Express middleware function
+ *
+ * @throws {Error} When Auth.js fails to process the request
  *
  * @example
  * ```ts
@@ -67,6 +67,8 @@ export type GetSessionResult = Promise<Session | null>;
  * @param req - The Express request object
  * @param config - The Auth.js configuration object
  * @returns The session object, or null if no session exists
+ *
+ * @throws {Error} When session validation fails or Auth.js returns an error
  *
  * @example
  * ```ts
