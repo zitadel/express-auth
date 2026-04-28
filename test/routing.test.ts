@@ -1,82 +1,92 @@
-import { describe, beforeEach, it, expect, vi } from "vitest"
-import supertest from "supertest"
-import express from "express"
-import { ExpressAuth } from "../src/index.js"
+import { jest, describe, beforeEach, it, expect } from '@jest/globals';
+import type express from 'express';
+import type supertest from 'supertest';
 
-import CredentialsProvider from "@auth/core/providers/credentials"
-import type { AuthConfig } from "@auth/core"
+import CredentialsProvider from '@auth/core/providers/credentials';
+import type { AuthConfig } from '@auth/core';
 
-// mock the toWebRequest, make it throw if "X-Test-Header" = 'throw'
-vi.mock("../src/lib/index.js", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("../src/lib/index.js")>()
+const originalLib = await import('../src/lib/index.js');
+
+jest.unstable_mockModule('../src/lib/index.js', () => {
   return {
-    ...mod,
-    toWebRequest: vi.fn((req) => {
-      if (req.headers["x-test-header"] === "throw") {
-        throw new Error("Test error")
+    toWebRequest: jest.fn<typeof originalLib.toWebRequest>((req) => {
+      if (req.headers['x-test-header'] === 'throw') {
+        throw new Error('Test error');
       }
-      return mod.toWebRequest(req)
+      return originalLib.toWebRequest(req);
     }),
-  }
-})
+    toExpressResponse: originalLib.toExpressResponse,
+  };
+});
+
+const { ExpressAuth } = await import('../src/index.js');
+const expressModule = await import('express');
+const supertestModule = await import('supertest');
 
 export const authConfig = {
-  secret: "secret",
+  secret: 'secret',
   providers: [
     CredentialsProvider({
-      credentials: { username: { label: "Username" } },
+      credentials: { username: { label: 'Username' } },
       async authorize(credentials) {
-        if (typeof credentials?.username === "string") {
-          const { username: name } = credentials
-          return { name: name, email: name.replace(" ", "") + "@example.com" }
+        if (typeof credentials?.username === 'string') {
+          const { username: name } = credentials;
+          return { name: name, email: name.replace(' ', '') + '@example.com' };
         }
-        return null
+        return null;
       },
     }),
   ],
-} satisfies AuthConfig
+} satisfies AuthConfig;
 
-describe("Middleware behaviour", () => {
-  let app: express.Express
-  let client: ReturnType<typeof supertest>
-  let error: Error | null
+describe('Middleware behaviour', () => {
+  let app: express.Express;
+  let client: ReturnType<typeof supertest>;
+  let error: Error | null;
 
   beforeEach(() => {
-    app = express()
-    client = supertest(app)
+    app = expressModule.default();
+    client = supertestModule.default(app);
 
-    error = null
+    error = null;
 
-    app.use("/auth/*", ExpressAuth(authConfig))
-    app.get("/*", (req, res, next) => {
+    app.use('/auth/*path', ExpressAuth(authConfig));
+    app.get('/*path', (req, res) => {
       try {
-        res.send("Hello World")
+        res.send('Hello World');
       } catch (err) {
-        error = err
+        error = err as Error;
       }
-    })
-    app.use((err, req, res, next) => {
-      error = err
-      res.status(500).send("Something broke!")
-    })
-  })
+    });
+    app.use(
+      (
+        err: Error,
+        req: express.Request,
+        res: express.Response,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        next: express.NextFunction,
+      ) => {
+        error = err;
+        res.status(500).send('Something broke!');
+      },
+    );
+  });
 
-  it("Should sent response only once", async () => {
+  it('Should sent response only once', async () => {
     const response = await client
-      .get("/auth/session")
-      .set("Accept", "application/json")
+      .get('/auth/session')
+      .set('Accept', 'application/json');
 
-    expect(response.status).toBe(200)
-    expect(error).toBe(null)
-  })
+    expect(response.status).toBe(200);
+    expect(error).toBe(null);
+  });
 
-  it("Should send status 500 if there is an error thrown in the auth middleware", async () => {
-    // send header that causes mock to throw
+  it('Should send status 500 if there is an error thrown in the auth middleware', async () => {
     const response = await client
-      .get("/auth/session")
-      .set("Accept", "application/json")
-      .set("X-Test-Header", "throw")
+      .get('/auth/session')
+      .set('Accept', 'application/json')
+      .set('X-Test-Header', 'throw');
 
-    expect(response.status).toBe(500)
-  })
-})
+    expect(response.status).toBe(500);
+  });
+});

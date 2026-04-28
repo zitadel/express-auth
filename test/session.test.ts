@@ -1,63 +1,67 @@
-import { vi, describe, it, beforeEach, expect } from "vitest"
-import supertest from "supertest"
-import express from "express"
+import { jest, describe, it, beforeEach, expect } from '@jest/globals';
+import type express from 'express';
+import type supertest from 'supertest';
 
 const sessionJson = {
   user: {
-    name: "John Doe",
-    email: "test@example.com",
-    image: "",
-    id: "1234",
+    name: 'John Doe',
+    email: 'test@example.com',
+    image: '',
+    id: '1234',
   },
-  expires: "",
-}
+  expires: '',
+};
 
-vi.mock("@auth/core", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("@auth/core")>()
+jest.unstable_mockModule('@auth/core', () => {
   return {
-    ...mod,
-    Auth: vi.fn((request, config) => {
+    Auth: jest.fn(() => {
       return new Response(JSON.stringify(sessionJson), {
         status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
+        headers: { 'Content-Type': 'application/json' },
+      });
     }),
-  }
-})
+    setEnvDefaults: jest.fn(),
+    createActionURL: jest.fn(
+      () => new URL('http://localhost:3000/auth/session'),
+    ),
+    customFetch: undefined,
+  };
+});
 
-// dynamic import to avoid loading Auth before hoisting
-const { getSession } = await import("../src/index.js")
+const { getSession } = await import('../src/index.js');
+const expressModule = await import('express');
+const supertestModule = await import('supertest');
 
-describe("getSession", () => {
-  let app: express.Express
-  let client: ReturnType<typeof supertest>
+describe('getSession', () => {
+  let app: express.Express;
+  let client: ReturnType<typeof supertest>;
 
   beforeEach(() => {
-    app = express()
-    client = supertest(app)
-  })
+    app = expressModule.default();
+    client = supertestModule.default(app);
+  });
 
-  it("Should return the mocked session from the Auth response", async () => {
-    let expectations: Function = () => {}
+  it('Should return the mocked session from the Auth response', async () => {
+    let expectations: () => void | Promise<void> = () => {};
 
-    app.post("/", async (req, res) => {
+    app.post('/', async (req, res) => {
       const session = await getSession(req, {
         providers: [],
-        secret: "secret",
-      })
+        secret: 'secret',
+      });
 
       expectations = async () => {
-        expect(session).toEqual(sessionJson)
-      }
+        expect(session).toEqual(sessionJson);
+      };
 
-      res.send("OK")
-    })
+      res.send('OK');
+    });
 
     await client
-      .post("/")
-      .set("X-Test-Header", "foo")
-      .set("Accept", "application/json")
+      .post('/')
+      .set('X-Test-Header', 'foo')
+      .set('Accept', 'application/json');
 
-    await expectations()
-  })
-})
+    await expectations();
+  });
+});

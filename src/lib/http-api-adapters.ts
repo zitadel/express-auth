@@ -1,97 +1,129 @@
-import { Request as ExpressRequest, Response as ExpressResponse } from "express"
+import type {
+  Request as ExpressRequest,
+  Response as ExpressResponse,
+} from 'express';
+import qs from 'qs';
+
+type RequestBody = string | Buffer;
 
 /**
- * Encodes an object as url-encoded string.
+ * Encodes an Express Request body based on the content type header
+ * using the qs library for consistent URL encoding.
  */
-export function encodeUrlEncoded(object: Record<string, any> = {}) {
-  const params = new URLSearchParams()
+function encodeRequestBody(req: ExpressRequest): RequestBody | undefined {
+  const contentType = req.headers['content-type'];
+  const method = req.method;
 
-  for (const [key, value] of Object.entries(object)) {
-    if (Array.isArray(value)) {
-      value.forEach((v) => params.append(key, v))
-    } else {
-      params.append(key, value)
+  let body: RequestBody | undefined;
+
+  if (!/GET|HEAD/.test(method.toUpperCase())) {
+    const rawBody = req.body;
+
+    if (rawBody !== undefined && rawBody !== null) {
+      if (contentType?.includes('application/x-www-form-urlencoded')) {
+        body = qs.stringify(rawBody as Record<string, unknown>, {
+          arrayFormat: 'repeat',
+        });
+      } else if (contentType?.includes('application/json')) {
+        body = JSON.stringify(rawBody);
+      } else if (typeof rawBody === 'string') {
+        body = rawBody;
+      } else if (Buffer.isBuffer(rawBody)) {
+        body = rawBody;
+      } else if (typeof rawBody === 'object') {
+        body = qs.stringify(rawBody as Record<string, unknown>, {
+          arrayFormat: 'repeat',
+        });
+      }
     }
   }
 
-  return params.toString()
+  return body;
 }
 
 /**
- * Encodes an object as JSON
+ * Converts an Express Request object to a Web API Request object.
+ *
+ * This adapter function handles the conversion between Express's request
+ * format and the standard Web API Request interface used by Auth.js core.
+ * It preserves headers, method, URL, and body content while ensuring
+ * proper encoding based on content type using the qs library.
+ *
+ * @param req - The Express request object to convert
+ * @returns A Web API Request object
+ *
+ * @example
+ * ```ts
+ * app.post('/api/auth/*', async (req, res) => {
+ *   const webRequest = toWebRequest(req);
+ *   const response = await Auth(webRequest, config);
+ *   await toExpressResponse(response, res);
+ * });
+ * ```
  */
-function encodeJson(obj: Record<string, any>) {
-  return JSON.stringify(obj)
-}
-
-/**
- * Encodes an Express Request body based on the content type header.
- */
-function encodeRequestBody(req: ExpressRequest) {
-  const contentType = req.headers["content-type"]
-
-  if (contentType?.includes("application/x-www-form-urlencoded")) {
-    return encodeUrlEncoded(req.body)
-  }
-
-  if (contentType?.includes("application/json")) {
-    return encodeJson(req.body)
-  }
-
-  return req.body
-}
-
-/**
- * Adapts an Express Request to a Web Request, returning the Web Request.
- */
-export function toWebRequest(req: ExpressRequest) {
-  const url = req.protocol + "://" + req.get("host") + req.originalUrl
-
-  const headers = new Headers()
+export function toWebRequest(req: ExpressRequest): Request {
+  const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+  const headers = new Headers();
 
   Object.entries(req.headers).forEach(([key, value]) => {
     if (Array.isArray(value)) {
-      value.forEach((v) => v && headers.append(key, v))
-      return
+      value.forEach((v) => {
+        if (v) {
+          headers.append(key, v);
+        }
+      });
+    } else if (value) {
+      headers.append(key, value);
     }
+  });
 
-    if (value) {
-      headers.append(key, value)
-    }
-  })
+  const rawBody = /GET|HEAD/.test(req.method)
+    ? undefined
+    : encodeRequestBody(req);
 
-  // GET and HEAD not allowed to receive body
-  const body = /GET|HEAD/.test(req.method) ? undefined : encodeRequestBody(req)
+  const body =
+    rawBody && Buffer.isBuffer(rawBody) ? new Uint8Array(rawBody) : rawBody;
 
-  const request = new Request(url, {
+  return new Request(url, {
     method: req.method,
     headers,
     body,
-  })
-
-  return request
+  });
 }
 
 /**
- * Adapts a Web Response to an Express Response, invoking appropriate
- * Express response methods to handle the response.
+ * Converts a Web API Response object to an Express response.
+ *
+ * This adapter function handles the conversion from Auth.js core's Web API
+ * Response format back to Express's response interface. It transfers headers,
+ * status codes, and body content appropriately.
+ *
+ * @param response - The Web API Response object to convert
+ * @param res - The Express response object to populate
+ *
+ * @example
+ * ```ts
+ * app.use('/api/auth/*', async (req, res) => {
+ *   const webRequest = toWebRequest(req);
+ *   const webResponse = await Auth(webRequest, config);
+ *   await toExpressResponse(webResponse, res);
+ * });
+ * ```
  */
 export async function toExpressResponse(
   response: Response,
-  res: ExpressResponse
-) {
+  res: ExpressResponse,
+): Promise<void> {
   response.headers.forEach((value, key) => {
     if (value) {
-      res.append(key, value)
+      res.append(key, value);
     }
-  })
+  });
 
-  // Explicitly write the headers for content-type
-  // https://stackoverflow.com/a/59449326/13944042
   res.writeHead(response.status, response.statusText, {
-    "Content-Type": response.headers.get("content-type") || "",
-  })
+    'Content-Type': response.headers.get('content-type') || '',
+  });
 
-  res.write(await response.text())
-  res.end()
+  res.write(await response.text());
+  res.end();
 }
