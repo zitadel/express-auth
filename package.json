@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/express-auth",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "A comprehensive Auth.js integration for Express applications with TypeScript support, framework-agnostic HTTP adapters, and role-based access control",
   "author": {
